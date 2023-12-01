@@ -120,7 +120,7 @@ class MainActivity : AppCompatActivity() {
             cursor?.use {
                 val columnIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
                 while (cursor.moveToNext()) {
-                    //todo
+                    // 打印扫描到的图片
                     val imagePath = cursor.getString(columnIndex)
                     Log.d("ImageScanner", "Scanned image: $imagePath")
                     imagePaths.add(cursor.getString(columnIndex))
