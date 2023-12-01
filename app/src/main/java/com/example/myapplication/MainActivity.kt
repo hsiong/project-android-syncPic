@@ -2,11 +2,14 @@ package com.example.myapplication
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.ProgressBar
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -22,6 +25,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var imageListAdapter: ImageListAdapter
     private val imagePaths = mutableListOf<String>()
     private lateinit var progressBar: ProgressBar
+    // android 13 兼容
+    private val requestPermissionLauncher = registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            // User allow the permission.
+        } else {
+            // User deny the permission.
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,36 +61,38 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkPermissionAndLoadImages() {
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
-                PERMISSION_REQUEST_CODE
-            )
-        } else {
-            CoroutineScope(Dispatchers.Main).launch {
-                loadImages()
+        
+        // 未授权
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
+                // android 13 需要获取 image 权限
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_EXTERNAL_STORAGE), PERMISSION_REQUEST_CODE)
+            } else {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), PERMISSION_REQUEST_CODE)
             }
+            return
+        }
+        
+        // 已授权文件权限
+        CoroutineScope(Dispatchers.Main).launch {
+            loadImages()
         }
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
+    /**
+     * 请求权限结果
+     */
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == PERMISSION_REQUEST_CODE) {
+        
+        if (requestCode == PERMISSION_REQUEST_CODE) { // 本次请求的code码结果
             if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
                 CoroutineScope(Dispatchers.Main).launch {
                     loadImages()
                 }
             } else {
-                // Handle permission denial
+                // 无权限继续请求
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_EXTERNAL_STORAGE), PERMISSION_REQUEST_CODE)
             }
         }
     }
@@ -105,6 +120,9 @@ class MainActivity : AppCompatActivity() {
             cursor?.use {
                 val columnIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
                 while (cursor.moveToNext()) {
+                    //todo
+                    val imagePath = cursor.getString(columnIndex)
+                    Log.d("ImageScanner", "Scanned image: $imagePath")
                     imagePaths.add(cursor.getString(columnIndex))
                     // 更新进度条
                     i++

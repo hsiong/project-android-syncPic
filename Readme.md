@@ -663,6 +663,28 @@ override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out
 
 使用Logcat来查看在点击按钮时是否有任何错误或异常被记录。在Android Studio中，打开Logcat并观察在点击按钮时是否有新的日志输出。
 
+## 无权限继续请求
+
+```kotlin
+/**
+ * 请求权限结果
+ */
+override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    
+    if (requestCode == PERMISSION_REQUEST_CODE) { // 本次请求的code码结果
+        if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
+            CoroutineScope(Dispatchers.Main).launch {
+                loadImages()
+            }
+        } else {
+            // 无权限继续请求
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_EXTERNAL_STORAGE), PERMISSION_REQUEST_CODE)
+        }
+    }
+}
+```
+
 # 将图片的路径以表格的形式展示在主界面
 
 创建一个完整的 Android 应用涉及到很多步骤，包括设置项目、编写代码、设计界面等。我会提供一个基本的指导来帮助你完成这个任务。由于篇幅限制，我无法提供完整项目的每一行代码，但我会尽量详细地描述关键步骤和代码。
@@ -1461,3 +1483,42 @@ private suspend fun loadImages() {
 - 这个过程可能会对性能有一定影响，特别是当图片数量非常多时。因此，确保在用户体验和性能之间找到合适的平衡。
 - 在实际应用中，您可能还需要考虑用户隐私和数据保护的问题，确保应用的行为符合用户期望和相关法规。
 - 确保您的应用拥有读取外部存储的权限，否则这些操作将无法执行。
+
+# 兼容 android 13
+
+在Android 13及以上版本中，`READ_EXTERNAL_STORAGE` 权限已经被废弃，不再有任何效果。因此，即使你在 `requestPermissionLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)` 成功后再请求 `READ_EXTERNAL_STORAGE` 权限，也不会产生任何效果。
+
+如果你需要访问设备上的图片、音频或视频文件，你应该分别请求 `READ_MEDIA_IMAGES`、`READ_MEDIA_AUDIO` 和 `READ_MEDIA_VIDEO` 这三个权限。这是一个示例：
+
+KotlinAI 生成的代码。仔细查看和使用。 [有关常见问题解答的详细信息](https://www.bing.com/new#faq).
+
+
+
+```kotlin
+class MainActivity : AppCompatActivity() {
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            // User allow the permission.
+            // Now request for another permission if needed
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_MEDIA_AUDIO), PERMISSION_REQUEST_CODE)
+        } else {
+            // User deny the permission.
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+        val requestBtn = findViewById<Button>(R.id.request_btn)
+        requestBtn.setOnClickListener {
+            if (Build.VERSION.SDK_INT >= 33) {
+                requestPermissionLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)
+            }
+        }
+    }
+}
+```
+
+在这个示例中，我们首先请求 `READ_MEDIA_IMAGES` 权限，如果用户允许了这个权限，我们再请求 `READ_MEDIA_AUDIO` 权限。请注意，这只是一个示例，你应该根据你的应用的实际需求来请求相应的权限。如果你的应用需要访问其他类型的文件，你可能需要使用 `Storage Access Framework (SAF)`。
